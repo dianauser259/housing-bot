@@ -1,54 +1,13 @@
 import asyncio
 from telegram import Bot
-from playwright.async_api import async_playwright
-import hashlib
 
 TOKEN = "8042937179:AAE9QPM8AtHkJhhBmiSjeroHZMIh2nnQO3w"
-CHAT_ID = "ТВОЙ_CHAT_ID"  # сюда подставишь свой chat_id после первого запуска
-URL = "https://www.saga.hamburg/immobiliensuche?Kategorie=APARTMENT"
 
-known_ads = set()
-
-async def fetch_new_ads():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
-        await page.goto(URL)
-        await page.wait_for_timeout(3000)
-        content = await page.content()
-        await browser.close()
-        return content
-
-def extract_ads(content):
-    from bs4 import BeautifulSoup
-    soup = BeautifulSoup(content, "html.parser")
-    ads = []
-    for item in soup.find_all("a", class_="teaser__link"):
-        title = item.get_text(strip=True)
-        href = item["href"]
-        link = f"https://www.saga.hamburg{href}"
-        ad_id = hashlib.md5(link.encode()).hexdigest()
-        ads.append((ad_id, title, link))
-    return ads
-
-async def notify_new_ads(bot, ads):
-    global known_ads
-    new_ads = [ad for ad in ads if ad[0] not in known_ads]
-    for ad_id, title, link in new_ads:
-        msg = f"🏠 *Новое объявление:*\n{title}\n{link}"
-        await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode="Markdown")
-        known_ads.add(ad_id)
-
-async def main_loop():
+async def main():
     bot = Bot(token=TOKEN)
-    while True:
-        try:
-            html = await fetch_new_ads()
-            ads = extract_ads(html)
-            await notify_new_ads(bot, ads)
-        except Exception as e:
-            print(f"Ошибка: {e}")
-        await asyncio.sleep(30)
+    updates = await bot.get_updates()
+    for update in updates:
+        print("chat_id:", update.message.chat.id)
 
 if __name__ == "__main__":
-    asyncio.run(main_loop())
+    asyncio.run(main())
